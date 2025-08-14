@@ -19,11 +19,17 @@ class UserResponse(BaseModel):
     class Config:
         orm_mode = True  # This allows the model to read data even if it is not a dict, but an ORM model instance
 
-
 class PostResponse(Post):
     id: int
     owner_id: int
     owner: UserResponse
+
+class PostOut(BaseModel):
+    post: PostResponse
+    vote: int
+
+    class Config:
+        orm_mode = True
 
 class UserCreate(BaseModel):
     email: EmailStr

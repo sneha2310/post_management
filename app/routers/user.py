@@ -1,6 +1,7 @@
 from .. import model, schemas, utils
 from ..database import get_db
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from fastapi import status, HTTPException, Depends, APIRouter
 from typing import List
 

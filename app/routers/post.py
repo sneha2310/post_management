@@ -1,6 +1,7 @@
 from .. import model, schemas, oauth2
 from ..database import get_db
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from fastapi import status, HTTPException, Depends, APIRouter
 
@@ -10,14 +11,17 @@ router = APIRouter(
 )
 
 # Using SQLAlchemy ORM to fetch post by id
-@router.get("/", response_model=List[schemas.PostResponse])
+@router.get("/", response_model=List[schemas.PostOut])
 def get_posts(db: Session = Depends(get_db), current_user: int =  Depends(oauth2.get_current_user),
               limit: int = 10, skip: int = 0,
               search: Optional[str]= ""): # id: int it defines that id which is coming as str type converts it to int
-    post = db.query(model.Post).filter(model.Post.title.contains(search)).limit(limit).offset(skip).all() # filter the post by id
-    if not post:
+    # post = db.query(model.Post).filter(model.Post.title.contains(search)).limit(limit).offset(skip).all() # filter the post by id
+    results = (db.query(model.Post, func.count(model.Vote.post_id).label("votes")).join(model.Vote, model.Vote.post_id == model.Post.id, isouter=True).
+               group_by(model.Post.id).filter(model.Post.title.contains(search)).limit(limit).offset(skip).all()) #left outer join
+    if not results:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"Posts not found")
-    return post
+    results = [{"post": post, "vote": vote} for post, vote in results]
+    return results
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.PostResponse) # status_code is used to set the response status code for create i.e. 201 instead of 200
@@ -32,11 +36,16 @@ def create_posts(post: schemas.Post, db: Session = Depends(get_db), current_user
 
 
 # Using SQLAlchemy ORM to fetch post by id
-@router.get("/{id}", response_model=schemas.Post)
+@router.get("/{id}", response_model=List[schemas.PostOut])
 def get_post(id: int, db: Session = Depends(get_db), current_user: int =  Depends(oauth2.get_current_user)): # id: int it defines that id which is coming as str type converts it to int
-    post = db.query(model.Post).filter(model.Post.id == id).first() # filter the post by id
+    # post = db.query(model.Post).filter(model.Post.id == id).first() # filter the post by id
+    post = db.query(model.Post, func.count(model.Vote.post_id).label("votes")).join(model.Vote,
+                                                                                        model.Vote.post_id == model.Post.id,
+                                                                                        isouter=True).group_by(model.Post.id).filter(model.Post.id == id)  # left outer join
+
     if not post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
+    post = [{"post": post, "vote": vote} for post, vote in post]
     return post
 
 
@@ -64,8 +73,8 @@ def update_post(id: int, post:schemas.Post, db: Session = Depends(get_db), curre
     if updated_post.first() == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
 
-    if post.first().owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to perform requested action")
+    # if post.owner_id != current_user.id:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to perform requested action")
 
     updated_post.update(post.dict(), synchronize_session=False)
     db.commit()

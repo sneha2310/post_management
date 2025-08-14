@@ -1,16 +1,29 @@
 from . import model
 from .database import engine
-from .routers import post, user, auth
+from .routers import post, user, auth, vote
 
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 
-# Create the database tables if they don't exist
-model.Base.metadata.create_all(bind=engine)
+# Create the database tables if they don't exist { as we are having alembic so there is no need for this }
+# model.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth.router)  # Include the auth router
 app.include_router(post.router)
 app.include_router(user.router)
+app.include_router(vote.router)
 
 
 # data = [
@@ -30,10 +43,10 @@ app.include_router(user.router)
 #             return i
 #     return None
 #
-# @app.get("/")
-# def root():
-#     return {"message": "Welcome to the FastAPI application!"}
-#
+@app.get("/")
+def root():
+    return {"message": "Welcome to the FastAPI application!"}
+
 # @app.get("/sql-alchemy")
 # def test_post(db: Session = Depends(get_db)):
 #     return {"message": "SQL Alchemy is working!"}
